@@ -105,7 +105,7 @@ class MainWindow: public QMainWindow {
   void loadNativeList();
   int tryLoadFile(const QString& fileName);
   void jumpToLine(const QString& fileName, int line);
-  bool loadFile(const QString& fileName, const char* encoding = "Windows-1251");
+  bool loadFile(const QString& fileName, const char* encoding = "GB18030");   // GB18030 是 GBK/GB2312 的超集，可正确读写中文源码
   bool isNewFile() const;
   bool isFileModified() const;
   void setFileModified(bool isModified);

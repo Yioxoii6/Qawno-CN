@@ -1325,7 +1325,7 @@ void MainWindow::on_actionSave_triggered() {
   }
 
   QTextStream output(&file);
-  output.setCodec(QTextCodec::codecForName("Windows-1251"));
+  output.setCodec(QTextCodec::codecForName("GB18030"));   // 原来是 Windows-1251，保存 GBK 源码会破坏中文
   output << getCurrentEditor()->toPlainText();
   getCurrentEditor()->textChanged();
   setFileModified(false);

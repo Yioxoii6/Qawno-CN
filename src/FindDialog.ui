@@ -17,13 +17,13 @@
    </sizepolicy>
   </property>
   <property name="windowTitle">
-   <string>Find</string>
+   <string>查找</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QLabel" name="findWhatLabel">
      <property name="text">
-      <string>Find what:</string>
+      <string>查找内容：</string>
      </property>
     </widget>
    </item>
@@ -33,7 +33,7 @@
    <item>
     <widget class="QLabel" name="replaceLabel">
      <property name="text">
-      <string>Replace:</string>
+      <string>替换为：</string>
      </property>
     </widget>
    </item>
@@ -56,28 +56,28 @@
    <item>
     <widget class="QCheckBox" name="matchCase">
      <property name="text">
-      <string>Match case</string>
+      <string>区分大小写</string>
      </property>
     </widget>
    </item>
    <item>
     <widget class="QCheckBox" name="matchWholeWords">
      <property name="text">
-      <string>Match whole words only</string>
+      <string>全字匹配</string>
      </property>
     </widget>
    </item>
    <item>
     <widget class="QCheckBox" name="useRegExp">
      <property name="text">
-      <string>Use regular expressions</string>
+      <string>使用正则表达式</string>
      </property>
     </widget>
    </item>
    <item>
     <widget class="QCheckBox" name="searchBackwards">
      <property name="text">
-      <string>Search backwards</string>
+      <string>向上搜索</string>
      </property>
     </widget>
    </item>
@@ -112,28 +112,28 @@
      <item>
       <widget class="QPushButton" name="findButton">
        <property name="text">
-        <string>Find</string>
+        <string>查找</string>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QPushButton" name="replaceButton">
        <property name="text">
-        <string>Replace</string>
+        <string>替换</string>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QPushButton" name="allButton">
        <property name="text">
-        <string>Replace All</string>
+        <string>全部替换</string>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QPushButton" name="closeButton">
        <property name="text">
-        <string>Close</string>
+        <string>关闭</string>
        </property>
       </widget>
      </item>

@@ -17,7 +17,7 @@
    </sizepolicy>
   </property>
   <property name="windowTitle">
-   <string>Server Settings</string>
+   <string>服务器设置</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_3">
    <item>
@@ -25,7 +25,7 @@
      <item>
       <widget class="QLabel" name="label">
        <property name="text">
-        <string>Server path:</string>
+        <string>服务器路径：</string>
        </property>
       </widget>
      </item>
@@ -41,7 +41,7 @@
        <item>
         <widget class="QPushButton" name="browse">
          <property name="text">
-          <string>Browse...</string>
+          <string>浏览...</string>
          </property>
         </widget>
        </item>
@@ -54,7 +54,7 @@
      <item>
       <widget class="QLabel" name="label_2">
        <property name="text">
-        <string>Server options:</string>
+        <string>服务器选项：</string>
        </property>
       </widget>
      </item>
@@ -68,7 +68,7 @@
      <item>
       <widget class="QLabel" name="label_3">
        <property name="text">
-        <string>Mode options:</string>
+        <string>模式选项：</string>
        </property>
       </widget>
      </item>

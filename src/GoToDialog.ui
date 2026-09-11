@@ -11,13 +11,13 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Go To Line</string>
+   <string>跳转到指定行</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QLabel" name="label">
      <property name="text">
-      <string>Jump to line number:</string>
+      <string>跳转到行号：</string>
      </property>
     </widget>
    </item>

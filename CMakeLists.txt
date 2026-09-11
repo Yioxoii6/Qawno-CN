@@ -33,6 +33,11 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 
+if(MSVC)
+  # 源码与 .ui 里的中文均为 UTF-8，必须显式告知 MSVC，否则会按本地代码页(GBK)解释而乱码
+  add_compile_options(/utf-8)
+endif()
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
