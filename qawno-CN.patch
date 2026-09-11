@@ -1,0 +1,1054 @@
+﻿# qawno 源码补丁（完整版）
+#
+# 基线：qawno 上游提交 5ad664c（2026-08-17 "Fix function heading differs error in v1.2.0.2670"）
+# 源码树：D:\qawno-src
+# 应用：cd D:\qawno-src && git apply <本补丁>
+#
+# 构建：
+#   "E:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build D:\qawno-src\build --config Release
+#   产物 D:\qawno-src\build\Release\qawno.exe
+# 部署：qawno.exe 与 qt_zh_CN.qm 必须同目录（五处，见 tools\qawno中文版使用说明.md）
+#
+# 改动分三类：
+#   1) MSVC 编码  —— CMakeLists.txt 加 /utf-8，否则源码与 .ui 里的中文按 GBK 解释而乱码
+#   2) GBK 支持   —— 编辑器按 GBK 读写（另见 tools\qawno编译器GBK调研结论.md）
+#   3) 界面汉化
+#      a. 主窗口菜单栏 + 6 个对话框（FindDialog / ReplaceDialog / ServerSettingsDialog /
+#         CompilerSettingsDialog / GoToDialog / AboutDialog）—— 改对应 .ui 文件
+#      b. 消息框按钮（OK -> 确定）与文件对话框（Open -> 打开）—— main.cpp 装入 qt_zh_CN.qm
+#      c. 右键菜单 —— 新增 src\ContextMenuChinese.h，在 EditorWidget / OutputWidget 的
+#         contextMenuEvent 里逐项改中文
+#
+# 【两条实测结论，别再走弯路】
+#   1) Qt 5.15.2 官方 qt_zh_CN.qm 里【没有】标准右键菜单词条：用 lconvert 转 .ts 后统计
+#      1395 条翻译，&Undo / &Redo / Cu&t / &Copy / &Paste / &Delete 全无，
+#      只有 "Select All" 且属于 Qt3 遗留上下文 Q3TextEdit，Qt5 的 QPlainTextEdit 不查它。
+#      所以只装 qt_zh_CN.qm 治不了右键菜单。
+#   2) createStandardContextMenu() 在 QPlainTextEdit 里【不是虚函数】（qplaintextedit.h:164
+#      无 virtual），无法重写；只有 contextMenuEvent() 是虚函数，必须在那里下手。
+#   3) 匹配时注意：Qt 把快捷键拼进 QAction::text()、以 \t 分隔（实测 "&Undo\tCtrl+Z"），
+#      且"删除"项的文字是 Delete（没有 & 前缀）。不按 \t 拆开就一条都匹配不上。
+#diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 13224f0..e1fc39f 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -33,6 +33,11 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+ endif()
+ 
++if(MSVC)
++  # 源码与 .ui 里的中文均为 UTF-8，必须显式告知 MSVC，否则会按本地代码页(GBK)解释而乱码
++  add_compile_options(/utf-8)
++endif()
++
+ set(CMAKE_AUTOMOC ON)
+ set(CMAKE_AUTORCC ON)
+ set(CMAKE_AUTOUIC ON)
+@@ -44,6 +49,7 @@ set(HEADERS
+   src/Compiler.h
+   src/CompilerSettingsDialog.h
+   src/ServerSettingsDialog.h
++  src/ContextMenuChinese.h
+   src/EditorWidget.h
+   src/FindDialog.h
+   src/GoToDialog.h
+diff --git a/src/AboutDialog.ui b/src/AboutDialog.ui
+index 69f83c7..8224cfe 100644
+--- a/src/AboutDialog.ui
++++ b/src/AboutDialog.ui
+@@ -11,7 +11,7 @@
+    </rect>
+   </property>
+   <property name="windowTitle">
+-   <string>About</string>
++   <string>关于</string>
+   </property>
+   <widget class="QDialogButtonBox" name="buttonBox">
+    <property name="geometry">
+diff --git a/src/CompilerSettingsDialog.ui b/src/CompilerSettingsDialog.ui
+index b70a4d6..b8c60d2 100644
+--- a/src/CompilerSettingsDialog.ui
++++ b/src/CompilerSettingsDialog.ui
+@@ -17,7 +17,7 @@
+    </sizepolicy>
+   </property>
+   <property name="windowTitle">
+-   <string>Compiler Settings</string>
++   <string>编译器设置</string>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout_3">
+    <item>
+@@ -25,7 +25,7 @@
+      <item>
+       <widget class="QLabel" name="label">
+        <property name="text">
+-        <string>Compiler path:</string>
++        <string>编译器路径：</string>
+        </property>
+       </widget>
+      </item>
+@@ -41,7 +41,7 @@
+        <item>
+         <widget class="QPushButton" name="browse">
+          <property name="text">
+-          <string>Browse...</string>
++          <string>浏览...</string>
+          </property>
+         </widget>
+        </item>
+@@ -54,7 +54,7 @@
+      <item>
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+-        <string>Compiler options:</string>
++        <string>编译器选项：</string>
+        </property>
+       </widget>
+      </item>
+diff --git a/src/ContextMenuChinese.h b/src/ContextMenuChinese.h
+new file mode 100644
+index 0000000..cb446de
+--- /dev/null
++++ b/src/ContextMenuChinese.h
+@@ -0,0 +1,79 @@
++// This file is part of qawno.
++//
++// qawno is free software: you can redistribute it and/or modify
++// it under the terms of the GNU General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// qawno is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++// GNU General Public License for more details.
++//
++// You should have received a copy of the GNU General Public License
++// along with qawno. If not, see <http://www.gnu.org/licenses/>.
++
++#ifndef CONTEXTMENUCHINESE_H
++#define CONTEXTMENUCHINESE_H
++
++// 右键菜单汉化（Qt 标准菜单的补充翻译）
++//
++// 背景（实测结论，不是猜的）：
++//   编辑器与输出框都是 QPlainTextEdit，它们的右键菜单由 Qt 内部提供
++//   （撤销/重做/剪切/复制/粘贴/删除/全选）。这些词条在 Qt 5.15.2 官方
++//   qt_zh_CN.qm 里【一条都没有】—— 用 lconvert 把该 qm 转成 .ts 后统计共
++//   1395 条翻译，其中 &Undo / &Redo / Cu&t / &Copy / &Paste / &Delete 全部缺失，
++//   只有 "Select All" 存在且属于 Qt3 遗留上下文 Q3TextEdit，Qt5 的
++//   QPlainTextEdit 并不会去查它。因此装 qt_zh_CN.qm 只能解决消息框按钮
++//   （OK -> 确定）与文件对话框（Open -> 打开），右键菜单依然是英文。
++//
++// 做法：
++//   createStandardContextMenu() 在 QPlainTextEdit 里【不是虚函数】，无法重写；
++//   但 contextMenuEvent() 是虚函数。于是在子类的 contextMenuEvent 里调用
++//   基类的 createStandardContextMenu() 拿到 QMenu，再把各项文字换成中文。
++//   （与 Qt 官方文档给出的写法一致。）
++
++#include <QMenu>
++#include <QAction>
++#include <QHash>
++#include <QString>
++#include <QList>
++
++// 把 Qt 标准右键菜单里的英文项换成中文。
++// 已经带中文的项（例如将来某个 Qt 版本自带了翻译）不会被改动。
++inline void qawnoTranslateContextMenu(QMenu *menu) {
++  if (!menu) return;
++
++  static const QHash<QString, QString> kMap = {
++    { QStringLiteral("&Undo"),            QStringLiteral("撤销(&U)")   },
++    { QStringLiteral("&Redo"),            QStringLiteral("重做(&R)")   },
++    { QStringLiteral("Cu&t"),             QStringLiteral("剪切(&T)")   },
++    { QStringLiteral("&Copy"),            QStringLiteral("复制(&C)")   },
++    { QStringLiteral("&Paste"),           QStringLiteral("粘贴(&P)")   },
++    { QStringLiteral("&Delete"),          QStringLiteral("删除(&D)")   },
++    { QStringLiteral("Delete"),           QStringLiteral("删除(&D)")   },  // Qt 5.15 这一项没有 & 前缀
++    { QStringLiteral("Select All"),       QStringLiteral("全选(&A)")   },
++    { QStringLiteral("&Select All"),      QStringLiteral("全选(&A)")   },
++    // 下面几条 Qt 在特定情况下才加，一并备着
++    { QStringLiteral("&Copy Link"),       QStringLiteral("复制链接(&C)") },
++    { QStringLiteral("&Clear"),           QStringLiteral("清空(&C)")   },
++  };
++
++  const QList<QAction *> actions = menu->actions();
++  for (QAction *action : actions) {
++    if (!action) continue;
++    // 关键：Qt 把快捷键拼在 text 里、用 \t 分隔（实测 "&Undo\tCtrl+Z" 就是这样），
++    // 所以必须先按 \t 拆开、只查标签部分，拼回去时快捷键原样保留。
++    const QString text = action->text();
++    const int tabPos = text.indexOf(QLatin1Char('\t'));
++    const QString label  = (tabPos >= 0) ? text.left(tabPos) : text;
++    const QString suffix = (tabPos >= 0) ? text.mid(tabPos)  : QString();
++
++    const auto it = kMap.constFind(label);
++    if (it != kMap.constEnd()) {
++      action->setText(it.value() + suffix);
++    }
++  }
++}
++
++#endif // CONTEXTMENUCHINESE_H
+diff --git a/src/EditorWidget.cpp b/src/EditorWidget.cpp
+index e6849ff..1cc4d5d 100644
+--- a/src/EditorWidget.cpp
++++ b/src/EditorWidget.cpp
+@@ -21,6 +21,7 @@
+ 
+ #include "EditorWidget.h"
+ #include "SyntaxHighlighter.h"
++#include "ContextMenuChinese.h"
+ 
+ EditorLineNumberWidget::EditorLineNumberWidget(EditorWidget *editor)
+   : QWidget(editor)
+@@ -190,6 +191,23 @@ void EditorWidget::resizeEvent(QResizeEvent *event) {
+   lineNumberArea_.updateGeometry();
+ }
+ 
++// 右键菜单汉化。
++// Qt 官方 qt_zh_CN.qm 里没有标准右键菜单的词条（撤销/重做/剪切/复制/粘贴/删除/全选），
++// 而 createStandardContextMenu() 在 QPlainTextEdit 里不是虚函数、无法重写，
++// 所以在虚函数 contextMenuEvent() 里取基类菜单、逐项改文字。
++void EditorWidget::contextMenuEvent(QContextMenuEvent *event) {
++#ifndef QT_NO_CONTEXTMENU
++  QMenu *menu = createStandardContextMenu();
++  if (menu) {
++    qawnoTranslateContextMenu(menu);
++    menu->exec(event->globalPos());
++    delete menu;
++  }
++#else
++  QPlainTextEdit::contextMenuEvent(event);
++#endif
++}
++
+ void EditorWidget::keyPressEvent(QKeyEvent *event) {
+   QTextCursor cursor = textCursor();
+   bool removePrevChar = false;
+diff --git a/src/EditorWidget.h b/src/EditorWidget.h
+index b2657ed..1db6995 100644
+--- a/src/EditorWidget.h
++++ b/src/EditorWidget.h
+@@ -19,6 +19,7 @@
+ #include <functional>
+ 
+ #include <QPlainTextEdit>
++#include <QContextMenuEvent>
+ 
+ #include "SyntaxHighlighter.h"
+ 
+@@ -71,6 +72,10 @@ class EditorWidget: public QPlainTextEdit {
+  protected:
+   void resizeEvent(QResizeEvent *event) override;
+   void keyPressEvent(QKeyEvent *event) override;
++  // 右键菜单汉化。为什么重写的是它而不是 createStandardContextMenu()：
++  // 后者在 QPlainTextEdit 里不是虚函数（见 Qt 头文件 qplaintextedit.h:164），
++  // 只有 contextMenuEvent() 是虚的，所以在这个回调里取基类菜单再改文字。
++  void contextMenuEvent(QContextMenuEvent *event) override;
+ 
+  private slots:
+   void highlightCurrentLine();
+diff --git a/src/FindDialog.ui b/src/FindDialog.ui
+index 0313027..acf6463 100644
+--- a/src/FindDialog.ui
++++ b/src/FindDialog.ui
+@@ -17,13 +17,13 @@
+    </sizepolicy>
+   </property>
+   <property name="windowTitle">
+-   <string>Find</string>
++   <string>查找</string>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QLabel" name="findWhatLabel">
+      <property name="text">
+-      <string>Find what:</string>
++      <string>查找内容：</string>
+      </property>
+     </widget>
+    </item>
+@@ -33,7 +33,7 @@
+    <item>
+     <widget class="QLabel" name="replaceLabel">
+      <property name="text">
+-      <string>Replace:</string>
++      <string>替换为：</string>
+      </property>
+     </widget>
+    </item>
+@@ -56,28 +56,28 @@
+    <item>
+     <widget class="QCheckBox" name="matchCase">
+      <property name="text">
+-      <string>Match case</string>
++      <string>区分大小写</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="matchWholeWords">
+      <property name="text">
+-      <string>Match whole words only</string>
++      <string>全字匹配</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="useRegExp">
+      <property name="text">
+-      <string>Use regular expressions</string>
++      <string>使用正则表达式</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="searchBackwards">
+      <property name="text">
+-      <string>Search backwards</string>
++      <string>向上搜索</string>
+      </property>
+     </widget>
+    </item>
+@@ -112,28 +112,28 @@
+      <item>
+       <widget class="QPushButton" name="findButton">
+        <property name="text">
+-        <string>Find</string>
++        <string>查找</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="replaceButton">
+        <property name="text">
+-        <string>Replace</string>
++        <string>替换</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="allButton">
+        <property name="text">
+-        <string>Replace All</string>
++        <string>全部替换</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="closeButton">
+        <property name="text">
+-        <string>Close</string>
++        <string>关闭</string>
+        </property>
+       </widget>
+      </item>
+diff --git a/src/GoToDialog.ui b/src/GoToDialog.ui
+index faf5144..fa35b5b 100644
+--- a/src/GoToDialog.ui
++++ b/src/GoToDialog.ui
+@@ -11,13 +11,13 @@
+    </rect>
+   </property>
+   <property name="windowTitle">
+-   <string>Go To Line</string>
++   <string>跳转到指定行</string>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QLabel" name="label">
+      <property name="text">
+-      <string>Jump to line number:</string>
++      <string>跳转到行号：</string>
+      </property>
+     </widget>
+    </item>
+diff --git a/src/MainWindow.cpp b/src/MainWindow.cpp
+index f11beda..6d52a89 100644
+--- a/src/MainWindow.cpp
++++ b/src/MainWindow.cpp
+@@ -1325,7 +1325,7 @@ void MainWindow::on_actionSave_triggered() {
+   }
+ 
+   QTextStream output(&file);
+-  output.setCodec(QTextCodec::codecForName("Windows-1251"));
++  output.setCodec(QTextCodec::codecForName("GB18030"));   // 原来是 Windows-1251，保存 GBK 源码会破坏中文
+   output << getCurrentEditor()->toPlainText();
+   getCurrentEditor()->textChanged();
+   setFileModified(false);
+diff --git a/src/MainWindow.h b/src/MainWindow.h
+index 9a54975..70f937c 100644
+--- a/src/MainWindow.h
++++ b/src/MainWindow.h
+@@ -105,7 +105,7 @@ class MainWindow: public QMainWindow {
+   void loadNativeList();
+   int tryLoadFile(const QString& fileName);
+   void jumpToLine(const QString& fileName, int line);
+-  bool loadFile(const QString& fileName, const char* encoding = "Windows-1251");
++  bool loadFile(const QString& fileName, const char* encoding = "GB18030");   // GB18030 是 GBK/GB2312 的超集，可正确读写中文源码
+   bool isNewFile() const;
+   bool isFileModified() const;
+   void setFileModified(bool isModified);
+diff --git a/src/MainWindow.ui b/src/MainWindow.ui
+index ef7dc52..ea312a9 100644
+--- a/src/MainWindow.ui
++++ b/src/MainWindow.ui
+@@ -131,7 +131,7 @@
+    </property>
+    <widget class="QMenu" name="menuFile">
+     <property name="title">
+-     <string>&amp;File</string>
++     <string>文件(&amp;F)</string>
+     </property>
+     <addaction name="actionNewGM"/>
+     <addaction name="actionNewFS"/>
+@@ -148,7 +148,7 @@
+    </widget>
+    <widget class="QMenu" name="menuEdit">
+     <property name="title">
+-     <string>&amp;Edit</string>
++     <string>编辑(&amp;E)</string>
+     </property>
+     <addaction name="actionUndo"/>
+     <addaction name="actionRedo"/>
+@@ -169,7 +169,7 @@
+    </widget>
+    <widget class="QMenu" name="menuBuild">
+     <property name="title">
+-     <string>&amp;Build</string>
++     <string>编译(&amp;B)</string>
+     </property>
+     <addaction name="actionCompile"/>
+     <addaction name="actionCompileRun"/>
+@@ -179,11 +179,11 @@
+    </widget>
+    <widget class="QMenu" name="menuSettings">
+     <property name="title">
+-     <string>&amp;Settings</string>
++     <string>设置(&amp;S)</string>
+     </property>
+     <widget class="QMenu" name="menuFont">
+      <property name="title">
+-      <string>&amp;Font</string>
++      <string>字体(&amp;Z)</string>
+      </property>
+      <addaction name="actionEditorFont"/>
+      <addaction name="actionOutputFont"/>
+@@ -197,7 +197,7 @@
+    </widget>
+    <widget class="QMenu" name="menuHelp">
+     <property name="title">
+-     <string>&amp;Help</string>
++     <string>帮助(&amp;H)</string>
+     </property>
+     <addaction name="actionAbout"/>
+     <addaction name="actionAboutQt"/>
+@@ -210,10 +210,10 @@
+   </widget>
+   <action name="actionNewGM">
+    <property name="text">
+-    <string>&amp;New Gamemode</string>
++    <string>新建游戏模式</string>
+    </property>
+    <property name="toolTip">
+-    <string>Create a new gamemode</string>
++    <string>新建一个游戏模式</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+N</string>
+@@ -221,18 +221,18 @@
+   </action>
+   <action name="actionNewFS">
+    <property name="text">
+-    <string>New Filterscript</string>
++    <string>新建滤镜脚本</string>
+    </property>
+    <property name="toolTip">
+-    <string>Create a new filterscript</string>
++    <string>新建一个滤镜脚本</string>
+    </property>
+   </action>
+   <action name="actionNewInc">
+    <property name="text">
+-    <string>New Include</string>
++    <string>新建包含文件</string>
+    </property>
+    <property name="toolTip">
+-    <string>Create a new include</string>
++    <string>新建一个包含文件</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+I</string>
+@@ -240,18 +240,18 @@
+   </action>
+   <action name="actionNewBlank">
+    <property name="text">
+-    <string>New Blank</string>
++    <string>新建空白文件</string>
+    </property>
+    <property name="toolTip">
+-    <string>Create a new blank file</string>
++    <string>新建一个空白文件</string>
+    </property>
+   </action>
+   <action name="actionOpen">
+    <property name="text">
+-    <string>&amp;Open...</string>
++    <string>打开(&amp;O)...</string>
+    </property>
+    <property name="toolTip">
+-    <string>Open and existing file</string>
++    <string>打开一个已有文件</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+O</string>
+@@ -259,10 +259,10 @@
+   </action>
+   <action name="actionSave">
+    <property name="text">
+-    <string>&amp;Save</string>
++    <string>保存(&amp;S)</string>
+    </property>
+    <property name="toolTip">
+-    <string>Save changes</string>
++    <string>保存修改</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+S</string>
+@@ -270,18 +270,18 @@
+   </action>
+   <action name="actionSaveAs">
+    <property name="text">
+-    <string>Save As...</string>
++    <string>另存为...</string>
+    </property>
+    <property name="toolTip">
+-    <string>Save changes to a different file</string>
++    <string>把修改另存到其它文件</string>
+    </property>
+   </action>
+   <action name="actionSaveAll">
+    <property name="text">
+-    <string>Save All</string>
++    <string>全部保存</string>
+    </property>
+    <property name="toolTip">
+-    <string>Save changes to all open tabs</string>
++    <string>保存所有已打开标签页的修改</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+Shift+S</string>
+@@ -289,10 +289,10 @@
+   </action>
+   <action name="actionQuit">
+    <property name="text">
+-    <string>&amp;Quit</string>
++    <string>退出(&amp;Q)</string>
+    </property>
+    <property name="toolTip">
+-    <string>Close the application</string>
++    <string>关闭程序</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+Q</string>
+@@ -300,7 +300,7 @@
+   </action>
+   <action name="actionUndo">
+    <property name="text">
+-    <string>&amp;Undo</string>
++    <string>撤销(&amp;U)</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+Z</string>
+@@ -308,7 +308,7 @@
+   </action>
+   <action name="actionRedo">
+    <property name="text">
+-    <string>&amp;Redo</string>
++    <string>重做(&amp;R)</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+Y</string>
+@@ -316,7 +316,7 @@
+   </action>
+   <action name="actionCut">
+    <property name="text">
+-    <string>Cut</string>
++    <string>剪切</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+X</string>
+@@ -324,7 +324,7 @@
+   </action>
+   <action name="actionCopy">
+    <property name="text">
+-    <string>&amp;Copy</string>
++    <string>复制(&amp;C)</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+C</string>
+@@ -332,7 +332,7 @@
+   </action>
+   <action name="actionPaste">
+    <property name="text">
+-    <string>&amp;Paste</string>
++    <string>粘贴(&amp;V)</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+V</string>
+@@ -340,7 +340,7 @@
+   </action>
+   <action name="actionFind">
+    <property name="text">
+-    <string>&amp;Find...</string>
++    <string>查找(&amp;F)...</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+F</string>
+@@ -348,7 +348,7 @@
+   </action>
+   <action name="actionFindNext">
+    <property name="text">
+-    <string>Find &amp;Next</string>
++    <string>查找下一个(&amp;N)</string>
+    </property>
+    <property name="shortcut">
+     <string>F3</string>
+@@ -356,7 +356,7 @@
+   </action>
+   <action name="actionCompile">
+    <property name="text">
+-    <string>&amp;Compile</string>
++    <string>编译(&amp;C)</string>
+    </property>
+    <property name="shortcut">
+     <string>F5</string>
+@@ -364,7 +364,7 @@
+   </action>
+   <action name="actionCompileRun">
+    <property name="text">
+-    <string>Compile + &amp;Run</string>
++    <string>编译并运行(&amp;R)</string>
+    </property>
+    <property name="shortcut">
+     <string>F6</string>
+@@ -372,7 +372,7 @@
+   </action>
+   <action name="actionRun">
+    <property name="text">
+-    <string>Run</string>
++    <string>运行</string>
+    </property>
+    <property name="shortcut">
+     <string>F7</string>
+@@ -380,7 +380,7 @@
+   </action>
+   <action name="actionNextErr">
+    <property name="text">
+-    <string>&amp;Next Error</string>
++    <string>下一个错误(&amp;N)</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+E</string>
+@@ -388,57 +388,57 @@
+   </action>
+   <action name="actionMark">
+    <property name="text">
+-    <string>Mark Entry</string>
++    <string>标记为入口</string>
+    </property>
+   </action>
+   <action name="actionAbout">
+    <property name="text">
+-    <string>&amp;About</string>
++    <string>关于(&amp;A)</string>
+    </property>
+   </action>
+   <action name="actionAboutQt">
+    <property name="text">
+-    <string>About &amp;Qt</string>
++    <string>关于 Qt(&amp;Q)</string>
+    </property>
+   </action>
+   <action name="actionCompiler">
+    <property name="text">
+-    <string>&amp;Compiler</string>
++    <string>编译器设置(&amp;C)</string>
+    </property>
+    <property name="toolTip">
+-    <string>Compiler settings</string>
++    <string>编译器设置</string>
+    </property>
+   </action>
+   <action name="actionServer">
+    <property name="text">
+-    <string>&amp;Server</string>
++    <string>服务器设置(&amp;S)</string>
+    </property>
+    <property name="toolTip">
+-    <string>Server settings</string>
++    <string>服务器设置</string>
+    </property>
+   </action>
+   <action name="actionEditorFont">
+    <property name="text">
+-    <string>&amp;Editor</string>
++    <string>编辑器字体(&amp;E)</string>
+    </property>
+    <property name="toolTip">
+-    <string>Change editor font</string>
++    <string>修改编辑器字体</string>
+    </property>
+   </action>
+   <action name="actionOutputFont">
+    <property name="text">
+-    <string>&amp;Output</string>
++    <string>输出窗口字体(&amp;O)</string>
+    </property>
+    <property name="toolTip">
+-    <string>Change font of the output window</string>
++    <string>修改输出窗口的字体</string>
+    </property>
+   </action>
+   <action name="actionClose">
+    <property name="text">
+-    <string>&amp;Close</string>
++    <string>关闭(&amp;C)</string>
+    </property>
+    <property name="toolTip">
+-    <string>Finish editing the current file</string>
++    <string>关闭当前文件</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+W</string>
+@@ -446,10 +446,10 @@
+   </action>
+   <action name="actionGoToLine">
+    <property name="text">
+-    <string>Go To Line...</string>
++    <string>转到行...</string>
+    </property>
+    <property name="toolTip">
+-    <string>Jump to the specified line</string>
++    <string>跳转到指定行</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+G</string>
+@@ -457,10 +457,10 @@
+   </action>
+   <action name="actionDelline">
+    <property name="text">
+-    <string>Delete Line</string>
++    <string>删除行</string>
+    </property>
+    <property name="toolTip">
+-    <string>Delete the current line</string>
++    <string>删除当前行</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+L</string>
+@@ -468,10 +468,10 @@
+   </action>
+   <action name="actionDupsel">
+    <property name="text">
+-    <string>Duplicate Selection</string>
++    <string>复制选中内容</string>
+    </property>
+    <property name="toolTip">
+-    <string>Duplicate the current selection.</string>
++    <string>复制当前选中的内容</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+D</string>
+@@ -479,10 +479,10 @@
+   </action>
+   <action name="actionDupline">
+    <property name="text">
+-    <string>Duplicate Line</string>
++    <string>复制当前行</string>
+    </property>
+    <property name="toolTip">
+-    <string>Duplicate the current line(s).</string>
++    <string>复制当前行</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+Shift+D</string>
+@@ -490,10 +490,10 @@
+   </action>
+   <action name="actionComment">
+    <property name="text">
+-    <string>Comment Line/Selection</string>
++    <string>注释行/选中内容</string>
+    </property>
+    <property name="toolTip">
+-    <string>Add // comments to a line, or /**/ comments to a selection.</string>
++    <string>对单行加 // 注释，对选中内容加 /**/ 注释</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+K</string>
+@@ -501,10 +501,10 @@
+   </action>
+   <action name="actionColours">
+    <property name="text">
+-    <string>Colour Selection</string>
++    <string>颜色选择</string>
+    </property>
+    <property name="toolTip">
+-    <string>Show the colour selection dialog (`m` matches sscanf).</string>
++    <string>显示颜色选择对话框（`m` 对应 sscanf 的匹配）</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+M</string>
+@@ -515,7 +515,7 @@
+     <bool>true</bool>
+    </property>
+    <property name="text">
+-    <string>Dark Mode</string>
++    <string>深色模式</string>
+    </property>
+   </action>
+   <action name="actionMRU">
+@@ -523,10 +523,10 @@
+     <bool>true</bool>
+    </property>
+    <property name="text">
+-    <string>MRU Tab Switching</string>
++    <string>标签页按最近使用顺序切换</string>
+    </property>
+    <property name="toolTip">
+-    <string>Using ctrl+tab switches to the most recently used (MRU) tab, not in order.</string>
++    <string>用 Ctrl+Tab 按最近使用顺序切换标签页，而不是按排列顺序</string>
+    </property>
+   </action>
+  </widget>
+diff --git a/src/OutputWidget.cpp b/src/OutputWidget.cpp
+index fa0a005..b741bb9 100644
+--- a/src/OutputWidget.cpp
++++ b/src/OutputWidget.cpp
+@@ -20,6 +20,7 @@
+ #include <QFileInfo>
+ 
+ #include "OutputWidget.h"
++#include "ContextMenuChinese.h"
+ 
+ static QFont defaultFont() {
+   #ifdef Q_OS_WINDOWS
+@@ -46,6 +47,20 @@ OutputWidget::~OutputWidget() {
+   settings.setValue("OutputFont", font().toString());
+ }
+ 
++// 右键菜单汉化（输出框同样是 QPlainTextEdit，带 Qt 标准右键菜单）
++void OutputWidget::contextMenuEvent(QContextMenuEvent* event) {
++#ifndef QT_NO_CONTEXTMENU
++  QMenu *menu = createStandardContextMenu();
++  if (menu) {
++    qawnoTranslateContextMenu(menu);
++    menu->exec(event->globalPos());
++    delete menu;
++  }
++#else
++  QPlainTextEdit::contextMenuEvent(event);
++#endif
++}
++
+ void OutputWidget::keyPressEvent(QKeyEvent* event) {
+   if (event->matches(QKeySequence::SelectAll)) {
+     QTextCursor cursor = textCursor();
+diff --git a/src/OutputWidget.h b/src/OutputWidget.h
+index da065e6..ce8ac3d 100644
+--- a/src/OutputWidget.h
++++ b/src/OutputWidget.h
+@@ -17,6 +17,7 @@
+ #define OUTPUTWIDGET_H
+ 
+ #include <QPlainTextEdit>
++#include <QContextMenuEvent>
+ 
+ class OutputWidget: public QPlainTextEdit {
+  Q_OBJECT
+@@ -34,6 +35,8 @@ public:
+ 
+ private:
+   void keyPressEvent(QKeyEvent* event) override;
++  // 右键菜单汉化（输出框也是 QPlainTextEdit，同样带 Qt 标准右键菜单）
++  void contextMenuEvent(QContextMenuEvent* event) override;
+ 
+   int error_ = -1;
+ };
+diff --git a/src/ReplaceDialog.ui b/src/ReplaceDialog.ui
+index a5d40a5..33fcb72 100644
+--- a/src/ReplaceDialog.ui
++++ b/src/ReplaceDialog.ui
+@@ -17,13 +17,13 @@
+    </sizepolicy>
+   </property>
+   <property name="windowTitle">
+-   <string>Find and replace</string>
++   <string>查找并替换</string>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QLabel" name="replaceWhatLabel">
+      <property name="text">
+-      <string>Replace what:</string>
++      <string>替换内容：</string>
+      </property>
+     </widget>
+    </item>
+@@ -33,7 +33,7 @@
+    <item>
+     <widget class="QLabel" name="replaceWithLabel">
+      <property name="text">
+-      <string>Replace with:</string>
++      <string>替换为：</string>
+      </property>
+     </widget>
+    </item>
+@@ -56,14 +56,14 @@
+    <item>
+     <widget class="QCheckBox" name="matchCase">
+      <property name="text">
+-      <string>Match case</string>
++      <string>区分大小写</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="matchWholeWords">
+      <property name="text">
+-      <string>Match whole words only</string>
++      <string>全字匹配</string>
+      </property>
+     </widget>
+    </item>
+@@ -76,14 +76,14 @@
+       </sizepolicy>
+      </property>
+      <property name="text">
+-      <string>Use regular expressions</string>
++      <string>使用正则表达式</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="searchBackwards">
+      <property name="text">
+-      <string>Search backwards</string>
++      <string>向上搜索</string>
+      </property>
+     </widget>
+    </item>
+@@ -118,21 +118,21 @@
+      <item>
+       <widget class="QPushButton" name="replaceButton">
+        <property name="text">
+-        <string>Replace</string>
++        <string>替换</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="replaceAllButton">
+        <property name="text">
+-        <string>Replace all</string>
++        <string>全部替换</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="closeButton">
+        <property name="text">
+-        <string>Close</string>
++        <string>关闭</string>
+        </property>
+       </widget>
+      </item>
+diff --git a/src/ServerSettingsDialog.ui b/src/ServerSettingsDialog.ui
+index 6f79c48..b124e67 100644
+--- a/src/ServerSettingsDialog.ui
++++ b/src/ServerSettingsDialog.ui
+@@ -17,7 +17,7 @@
+    </sizepolicy>
+   </property>
+   <property name="windowTitle">
+-   <string>Server Settings</string>
++   <string>服务器设置</string>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout_3">
+    <item>
+@@ -25,7 +25,7 @@
+      <item>
+       <widget class="QLabel" name="label">
+        <property name="text">
+-        <string>Server path:</string>
++        <string>服务器路径：</string>
+        </property>
+       </widget>
+      </item>
+@@ -41,7 +41,7 @@
+        <item>
+         <widget class="QPushButton" name="browse">
+          <property name="text">
+-          <string>Browse...</string>
++          <string>浏览...</string>
+          </property>
+         </widget>
+        </item>
+@@ -54,7 +54,7 @@
+      <item>
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+-        <string>Server options:</string>
++        <string>服务器选项：</string>
+        </property>
+       </widget>
+      </item>
+@@ -68,7 +68,7 @@
+      <item>
+       <widget class="QLabel" name="label_3">
+        <property name="text">
+-        <string>Mode options:</string>
++        <string>模式选项：</string>
+        </property>
+       </widget>
+      </item>
+diff --git a/src/main.cpp b/src/main.cpp
+index 8cab88a..ea1260d 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -16,6 +16,8 @@
+ #include <QApplication>
+ #include <QCoreApplication>
+ #include <QTranslator>
++#include <QLibraryInfo>
++#include <QLocale>
+ 
+ #include <qawno.h>
+ #include "MainWindow.h"
+@@ -45,6 +47,25 @@ int main(int argc, char **argv) {
+   QCoreApplication::setOrganizationDomain("zeex.github.io");
+   QCoreApplication::installTranslator(new ColourTranslator());
+ 
++  // [中文汉化] 装入 Qt 官方中文翻译（qt_zh_CN.qm）。
++  // 为什么必须装：qawno 的右键菜单（撤销/重做/剪切/复制/粘贴/删除/全选）、
++  // 各标准对话框的按钮（确定/取消/打开/保存）以及文件选择框，全部由 Qt 内部提供，
++  // 程序自己的 .ui 里没有这些字符串 —— 只有装了翻译器它们才会显示中文。
++  // 先找 exe 同目录（随程序一起分发，不依赖 Qt 安装路径），找不到再退回 Qt 自带的 translations 目录。
++  {
++    QTranslator* qtZh = new QTranslator();
++    if (qtZh->load(QCoreApplication::applicationDirPath() + QStringLiteral("/qt_zh_CN.qm"))) {
++      QCoreApplication::installTranslator(qtZh);
++    } else {
++      QTranslator* qtZhFallback = new QTranslator();
++      if (qtZhFallback->load(QLocale(QLocale::Chinese, QLocale::China), QStringLiteral("qt"),
++                             QStringLiteral("_"),
++                             QLibraryInfo::location(QLibraryInfo::TranslationsPath))) {
++        QCoreApplication::installTranslator(qtZhFallback);
++      }
++    }
++  }
++
+   MainWindow mainWindow;
+   mainWindow.show();
+ 

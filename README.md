@@ -1,3 +1,34 @@
+# Qawno-CN —— open.mp qawno 中文本地化版
+
+> 基于上游 [openmultiplayer/qawno](https://github.com/openmultiplayer/qawno) 提交 `5ad664c` (v1.2.0.2670)
+
+## 这个版本做了什么
+
+- **界面全面汉化**：主窗口菜单栏、查找/替换/服务器设置/编译器设置/跳转/关于 6 个对话框、
+  消息框按钮、文件对话框，以及 **代码编辑区与输出区的右键菜单**（撤销/重做/剪切/复制/粘贴/删除/全选）
+- **GBK / GB2312 脚本支持**：中文 Windows 上常见的中文 Pawn 脚本不再乱码
+- **MSVC 编码修正**：`CMakeLists.txt` 加 `/utf-8`，否则中文界面文字会全部乱码
+
+**详细说明、构建方法、部署清单与验证方式见 [`docs/汉化说明.md`](docs/汉化说明.md)。**
+
+## 快速构建
+
+```
+cmake -S . -B build -DCMAKE_PREFIX_PATH="<Qt 5.15.2 msvc2019_64 路径>"
+cmake --build build --config Release
+```
+
+产物 `build\Release\qawno.exe`，运行时需与 `qt_zh_CN.qm` 及 Qt 运行库同目录（见汉化说明）。
+
+## 注意
+
+- 许可证沿用上游 **GPL-3.0**（见 `LICENSE.txt`）
+- `qt_zh_CN.qm` 取自 Qt 5.15.2 官方翻译文件
+- `qawno-CN.patch` 是相对上游 `5ad664c` 的完整改动补丁
+
+---
+
+以下是上游 README 原文：
  Qawno
 =======
 
