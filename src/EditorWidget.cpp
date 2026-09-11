@@ -21,6 +21,7 @@
 
 #include "EditorWidget.h"
 #include "SyntaxHighlighter.h"
+#include "ContextMenuChinese.h"
 
 EditorLineNumberWidget::EditorLineNumberWidget(EditorWidget *editor)
   : QWidget(editor)
@@ -188,6 +189,23 @@ void EditorWidget::resizeEvent(QResizeEvent *event) {
   Q_UNUSED(event);
   // FIXME: This should be done somwhere inside EditorLineNumberWidget.
   lineNumberArea_.updateGeometry();
+}
+
+// 右键菜单汉化。
+// Qt 官方 qt_zh_CN.qm 里没有标准右键菜单的词条（撤销/重做/剪切/复制/粘贴/删除/全选），
+// 而 createStandardContextMenu() 在 QPlainTextEdit 里不是虚函数、无法重写，
+// 所以在虚函数 contextMenuEvent() 里取基类菜单、逐项改文字。
+void EditorWidget::contextMenuEvent(QContextMenuEvent *event) {
+#ifndef QT_NO_CONTEXTMENU
+  QMenu *menu = createStandardContextMenu();
+  if (menu) {
+    qawnoTranslateContextMenu(menu);
+    menu->exec(event->globalPos());
+    delete menu;
+  }
+#else
+  QPlainTextEdit::contextMenuEvent(event);
+#endif
 }
 
 void EditorWidget::keyPressEvent(QKeyEvent *event) {

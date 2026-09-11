@@ -20,6 +20,7 @@
 #include <QFileInfo>
 
 #include "OutputWidget.h"
+#include "ContextMenuChinese.h"
 
 static QFont defaultFont() {
   #ifdef Q_OS_WINDOWS
@@ -44,6 +45,20 @@ OutputWidget::OutputWidget(QWidget *parent):
 OutputWidget::~OutputWidget() {
   QSettings settings;
   settings.setValue("OutputFont", font().toString());
+}
+
+// 右键菜单汉化（输出框同样是 QPlainTextEdit，带 Qt 标准右键菜单）
+void OutputWidget::contextMenuEvent(QContextMenuEvent* event) {
+#ifndef QT_NO_CONTEXTMENU
+  QMenu *menu = createStandardContextMenu();
+  if (menu) {
+    qawnoTranslateContextMenu(menu);
+    menu->exec(event->globalPos());
+    delete menu;
+  }
+#else
+  QPlainTextEdit::contextMenuEvent(event);
+#endif
 }
 
 void OutputWidget::keyPressEvent(QKeyEvent* event) {

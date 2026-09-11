@@ -17,6 +17,7 @@
 #define OUTPUTWIDGET_H
 
 #include <QPlainTextEdit>
+#include <QContextMenuEvent>
 
 class OutputWidget: public QPlainTextEdit {
  Q_OBJECT
@@ -34,6 +35,8 @@ public:
 
 private:
   void keyPressEvent(QKeyEvent* event) override;
+  // 右键菜单汉化（输出框也是 QPlainTextEdit，同样带 Qt 标准右键菜单）
+  void contextMenuEvent(QContextMenuEvent* event) override;
 
   int error_ = -1;
 };

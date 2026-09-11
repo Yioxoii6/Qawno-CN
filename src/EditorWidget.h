@@ -19,6 +19,7 @@
 #include <functional>
 
 #include <QPlainTextEdit>
+#include <QContextMenuEvent>
 
 #include "SyntaxHighlighter.h"
 
@@ -71,6 +72,10 @@ class EditorWidget: public QPlainTextEdit {
  protected:
   void resizeEvent(QResizeEvent *event) override;
   void keyPressEvent(QKeyEvent *event) override;
+  // 右键菜单汉化。为什么重写的是它而不是 createStandardContextMenu()：
+  // 后者在 QPlainTextEdit 里不是虚函数（见 Qt 头文件 qplaintextedit.h:164），
+  // 只有 contextMenuEvent() 是虚的，所以在这个回调里取基类菜单再改文字。
+  void contextMenuEvent(QContextMenuEvent *event) override;
 
  private slots:
   void highlightCurrentLine();

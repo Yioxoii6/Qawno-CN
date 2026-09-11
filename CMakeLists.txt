@@ -49,6 +49,7 @@ set(HEADERS
   src/Compiler.h
   src/CompilerSettingsDialog.h
   src/ServerSettingsDialog.h
+  src/ContextMenuChinese.h
   src/EditorWidget.h
   src/FindDialog.h
   src/GoToDialog.h
